@@ -298,7 +298,7 @@ jobs:
           node-version: 22
 
       - name: Install the QA runner
-        run: npm install -g "@leera/qa-runner@${LEERA_QA_RUNNER_VERSION}"
+        run: npm install -g "@leera.io/qa-runner@${LEERA_QA_RUNNER_VERSION}"
 
       - name: Cache Chromium
         uses: actions/cache@v4
@@ -309,7 +309,7 @@ jobs:
       - name: Install Chromium and its system libraries
         run: |
           leera-qa-runner setup browsers
-          sudo "$(command -v node)" "$(npm root -g)/@leera/qa-runner/node_modules/playwright-core/cli.js" install-deps chromium
+          sudo "$(command -v node)" "$(npm root -g)/@leera.io/qa-runner/node_modules/playwright-core/cli.js" install-deps chromium
 
       - name: Run the web tests
         run: |
@@ -384,7 +384,7 @@ jobs:
 
       - name: Install the QA runner
         run: |
-          npm install -g "@leera/qa-runner@${LEERA_QA_RUNNER_VERSION}"
+          npm install -g "@leera.io/qa-runner@${LEERA_QA_RUNNER_VERSION}"
           leera-qa-runner setup android
 
       - name: Cache the emulator
@@ -466,13 +466,13 @@ jobs:
           node-version: 22
 
       - name: Install the QA runner
-        run: npm install -g "@leera/qa-runner@${LEERA_QA_RUNNER_VERSION}"
+        run: npm install -g "@leera.io/qa-runner@${LEERA_QA_RUNNER_VERSION}"
 
       - name: Read the Xcode and XCUITest driver versions
         id: versions
         run: |
           echo "xcode=$(xcodebuild -version | awk 'NR==1 {print $2}')" >> "$GITHUB_OUTPUT"
-          echo "driver=$(node -p "require('$(npm root -g)/@leera/qa-runner/node_modules/appium-xcuitest-driver/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "driver=$(node -p "require('$(npm root -g)/@leera.io/qa-runner/node_modules/appium-xcuitest-driver/package.json').version")" >> "$GITHUB_OUTPUT"
 
       # Building WebDriverAgent takes minutes; reuse it while Xcode and the driver stay the same.
       - name: Cache WebDriverAgent
@@ -533,9 +533,9 @@ qa-web:
     paths:
       - .leera-qa-runner/browsers
   script:
-    - npm install -g "@leera/qa-runner@${LEERA_QA_RUNNER_VERSION}"
+    - npm install -g "@leera.io/qa-runner@${LEERA_QA_RUNNER_VERSION}"
     - leera-qa-runner setup browsers
-    - node "$(npm root -g)/@leera/qa-runner/node_modules/playwright-core/cli.js" install-deps chromium
+    - node "$(npm root -g)/@leera.io/qa-runner/node_modules/playwright-core/cli.js" install-deps chromium
     - leera-qa-runner ci --platform web --environment staging --timeout 60 --junit qa-results/junit.xml
   artifacts:
     when: always
@@ -552,7 +552,7 @@ install Xvfb first:
 
 ```yaml
       - run: sudo apt-get update && sudo apt-get install -y xvfb
-      - run: npm install -g @leera/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
+      - run: npm install -g @leera.io/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
       - run: npm ci && npm run make           # your own Electron build
       - run: >-
           leera-qa-runner ci --platform electron --environment staging
@@ -585,7 +585,7 @@ display:
             libayatana-appindicator3-dev librsvg2-dev
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install tauri-driver --version 2.0.6 --locked
-      - run: npm install -g @leera/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
+      - run: npm install -g @leera.io/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
       - run: npm ci && npm run tauri build -- --bundles appimage    # your own Tauri build
       - run: >-
           leera-qa-runner ci --platform tauri --environment staging
@@ -603,7 +603,7 @@ the driver is, and pass the portable executable Cargo builds:
 
 ```yaml
       - run: cargo install tauri-driver --version 2.0.6 --locked
-      - run: npm install -g @leera/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
+      - run: npm install -g @leera.io/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
       - run: npm ci && npm run tauri build -- --no-bundle           # your own Tauri build
       # … download msedgedriver.exe matching the installed WebView2 version into $PWD …
       - run: leera-qa-runner config set tauri.native_driver_path "$PWD\msedgedriver.exe"
@@ -641,7 +641,7 @@ interactive session, so the runner can install WinAppDriver itself:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install -g @leera/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
+      - run: npm install -g @leera.io/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
       # Developer Mode (a registry value; fine on a throwaway CI machine)
       - run: reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
         shell: cmd
@@ -675,7 +675,7 @@ image:
         with:
           node-version: 22
       - run: sudo xcode-select -s /Applications/Xcode.app
-      - run: npm install -g @leera/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
+      - run: npm install -g @leera.io/qa-runner@${{ env.LEERA_QA_RUNNER_VERSION }}
       - run: leera-qa-runner setup macos
       - run: xcodebuild -scheme MyApp -configuration Release -derivedDataPath build && ditto -c -k --keepParent build/Build/Products/Release/MyApp.app MyApp.zip
       - run: >-
@@ -693,7 +693,7 @@ permission); without it `--video` has no effect for these platforms.
 ### Other CI systems
 
 Any CI that can run Node 22.12 or newer works the same way: install
-`@leera/qa-runner` at your instance's version, run the platform's `setup`
+`@leera.io/qa-runner` at your instance's version, run the platform's `setup`
 command (none for Electron; the WebDriver pieces above for Tauri; `setup windows`
 or `setup macos` for native apps), and run `leera-qa-runner ci` with `RUNNER_URL` and
 `RUNNER_TOKEN` in the environment. Keep the CI job's own time limit above `--timeout`, so the

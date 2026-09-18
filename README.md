@@ -75,7 +75,7 @@ SmartScreen may warn before it runs ("More info" → "Run anyway").
 With Node.js 22.12 or newer:
 
 ```sh
-npm install -g @leera/qa-runner
+npm install -g @leera.io/qa-runner
 leera-qa-runner setup browsers
 ```
 
@@ -324,6 +324,10 @@ It reads the same `RUNNER_*` variables.
    - macOS package: `sudo rm -rf /usr/local/lib/leera-qa-runner /usr/local/bin/leera-qa-runner && sudo pkgutil --forget io.leera.qa-runner`
    - Linux: `rm -rf ~/.local/lib/leera-qa-runner ~/.local/bin/leera-qa-runner`
    - Windows: *Settings → Apps → Leera QA Runner → Uninstall*
-   - npm: `npm uninstall -g @leera/qa-runner`
+   - npm: `npm uninstall -g @leera.io/qa-runner`
 3. Remove its data: `rm -rf ~/.leera-qa-runner` (Windows: `%USERPROFILE%\.leera-qa-runner`).
 4. Delete the runner from the Test runners page, or revoke its token.
+
+## License
+
+Proprietary — see [LICENSE](LICENSE). Free to use with a Leera workspace.

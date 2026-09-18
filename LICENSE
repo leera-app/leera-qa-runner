@@ -1,0 +1,64 @@
+Leera QA Runner License
+
+Copyright (c) 2026 Leera AI Solutions LLP. All rights reserved.
+
+The Leera QA Runner (the "Software") is proprietary software owned by Leera AI
+Solutions LLP ("Leera"). It is licensed, not sold. By installing or running the
+Software you agree to this license. If you do not agree, do not install or run
+it.
+
+1. Grant. Leera grants you a free, non-exclusive, non-transferable,
+   non-sublicensable, revocable right to install and run unmodified copies of
+   the Software, in the form Leera distributes it, solely to execute tests
+   against and report results to a Leera workspace that you are authorised to
+   use, whether hosted by Leera or on a self-hosted Leera instance you are
+   licensed to operate. This includes evaluation and trial use on the same
+   terms. You may run as many copies as that purpose requires, including on
+   your own machines and in your continuous-integration systems.
+
+2. Restrictions. Except as this license expressly permits, you may not:
+   (a) copy, distribute, sell, rent, lease, sublicense, publish or otherwise
+       make the Software available to any third party, including as part of
+       another product or a hosted service (installing it from Leera's
+       official distribution channels on systems you control is permitted);
+   (b) modify, adapt, translate or create derivative works of the Software;
+   (c) reverse engineer, decompile or disassemble the Software, except to the
+       extent applicable law expressly permits this despite this restriction;
+   (d) use the Software with any service other than a Leera workspace, or to
+       build a competing product;
+   (e) remove or alter any copyright, trademark or other proprietary notices.
+   Third-party open-source components included with the Software are licensed
+   under their own terms, which govern those components.
+
+3. Ownership. Leera and its licensors retain all right, title and interest in
+   the Software, including all intellectual property rights. No rights are
+   granted other than those expressly stated in this license.
+
+4. No warranty. THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT
+   WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY
+   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND
+   NON-INFRINGEMENT. YOU ARE RESPONSIBLE FOR THE SYSTEMS, APPLICATIONS AND DATA
+   YOU RUN THE SOFTWARE AGAINST.
+
+5. Limitation of liability. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW,
+   IN NO EVENT WILL LEERA OR ITS LICENSORS BE LIABLE FOR ANY INDIRECT,
+   INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR FOR ANY
+   LOSS OF DATA, PROFITS, REVENUE OR BUSINESS, ARISING OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THIS LICENSE, HOWEVER CAUSED AND UNDER ANY THEORY OF
+   LIABILITY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. LEERA'S TOTAL
+   LIABILITY UNDER THIS LICENSE IS LIMITED AS SET OUT IN THE AGREEMENT UNDER
+   WHICH YOU USE LEERA; IF NO SUCH AGREEMENT APPLIES, IT WILL NOT EXCEED THE
+   AMOUNTS YOU PAID LEERA FOR THE RELEVANT WORKSPACE IN THE TWELVE MONTHS BEFORE
+   THE EVENT GIVING RISE TO THE CLAIM.
+
+6. Termination. This license ends automatically if you breach it, and Leera
+   may end it on notice at any time. It also ends for a workspace when your
+   right to use that workspace ends. On termination you must stop using the
+   Software and delete all copies in your possession or control. Sections 2 to
+   7 survive termination.
+
+7. General. If you have a separate written agreement with Leera covering the
+   Software, that agreement prevails where it conflicts with this license. If
+   any provision is held unenforceable, the rest remains in effect.
+
+Contact: contact@leera.io

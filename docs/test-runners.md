@@ -60,7 +60,7 @@ with the same version as the server:
 | Install | Best for |
 |---|---|
 | **Installer** (macOS `.pkg`, Windows `.exe`, Linux `.tar.gz`) with Node bundled | Laptops and dedicated test machines; web, Android, Electron, Tauri, iOS and macOS apps on a Mac, Windows apps on Windows |
-| **npm** `@leera/qa-runner` | Machines that already have Node 22.12 or newer, and [CI](#ci-runners); web, Android, Electron, Tauri, iOS and macOS apps on a Mac, Windows apps on Windows |
+| **npm** `@leera.io/qa-runner` | Machines that already have Node 22.12 or newer, and [CI](#ci-runners); web, Android, Electron, Tauri, iOS and macOS apps on a Mac, Windows apps on Windows |
 | **Docker** `ghcr.io/leera-app/leera-qa-runner` | Servers and CI; web tests only |
 
 The **Test runners** page in the app shows each of these with your instance's
@@ -145,7 +145,7 @@ command that installs them, rather than running `sudo` itself.
 ### npm
 
 ```bash
-npm install -g @leera/qa-runner@<version>
+npm install -g @leera.io/qa-runner@<version>
 ```
 
 Needs Node.js 22.12 or newer. Appium and its UiAutomator2 (Android), XCUITest
@@ -327,6 +327,7 @@ leera-qa-runner config set-token     # hidden prompt
 | `RUNNER_IOS_TEAM_ID` | — | Apple Developer Team ID that signs WebDriverAgent for real iOS devices (config key `ios.team_id`) |
 | `RUNNER_IOS_WDA_BUNDLE_ID` | — | Bundle id WebDriverAgent is signed under on real devices (`ios.wda_bundle_id`) |
 | `RUNNER_IOS_SIGNING_ID` | `Apple Development` | Code signing identity for WebDriverAgent (`ios.signing_id`) |
+| `RUNNER_IOS_BOOT_TIMEOUT_SECS` | `300` | Seconds one iOS simulator boot may take before the runner shuts it down and tries once more (`ios.simulator_boot_timeout_secs`, 30–3600) |
 | `RUNNER_TAURI_DRIVER` | — | Path of the `tauri-driver` executable (config key `tauri.driver_path`) |
 | `RUNNER_TAURI_NATIVE_DRIVER` | — | Path of the native WebDriver server `tauri-driver` uses: `msedgedriver.exe` on Windows, `WebKitWebDriver` on Linux (config key `tauri.native_driver_path`) |
 | `RUNNER_TAURI_MACOS_PLUGIN` | `false` | `1` on a Mac runner whose Tauri builds embed the WebDriver plugin (config key `tauri.macos_plugin`); see [Tauri on macOS](#tauri-on-macos) |
@@ -367,6 +368,7 @@ Settings for app platforms (`config set KEY VALUE`):
 | `ios.team_id` | Apple Developer Team ID (10 characters) that signs WebDriverAgent for real iOS devices (`RUNNER_IOS_TEAM_ID`) |
 | `ios.wda_bundle_id` | Bundle id to sign WebDriverAgent under, e.g. `com.example.WebDriverAgentRunner` (`RUNNER_IOS_WDA_BUNDLE_ID`) |
 | `ios.signing_id` | Code signing identity, default `Apple Development` (`RUNNER_IOS_SIGNING_ID`) |
+| `ios.simulator_boot_timeout_secs` | Seconds one simulator boot may take, default 300; a boot that times out is shut down and retried once (`RUNNER_IOS_BOOT_TIMEOUT_SECS`) |
 | `tauri.driver_path` | Absolute path of `tauri-driver` (`RUNNER_TAURI_DRIVER`); otherwise `~/.cargo/bin/tauri-driver`, then `PATH` |
 | `tauri.native_driver_path` | Windows: absolute path of the `msedgedriver.exe` that matches the installed WebView2 version. Linux: path of `WebKitWebDriver` when it is not on `PATH` (`RUNNER_TAURI_NATIVE_DRIVER`) |
 | `tauri.macos_plugin` | `true` on a Mac whose Tauri builds embed the WebDriver plugin (default `false`; `RUNNER_TAURI_MACOS_PLUGIN`) |
@@ -715,11 +717,14 @@ leera-qa-runner doctor --platform ios
 
 **Simulators are booted on demand.** When a job or session needs a simulator
 that is not running, the runner boots it headless (`--headed` also opens
-Simulator.app), waits until the boot completes, and prepares it once per boot:
+Simulator.app), waits until the boot completes (`simctl bootstatus`, up to
+`ios.simulator_boot_timeout_secs`, default 300 s; a boot that times out is shut
+down and tried once more), and prepares it once per boot:
 keyboard autocorrection and predictions off, and the one-time keyboard
 introduction marked as seen, so typing is predictable. A simulator the runner
 booted for a job is shut down again when the job ends; one that was already
-running stays running.
+running stays running. Appium is told whether Simulator.app is open, so it uses
+the booted simulator as it is instead of booting it a second time.
 
 When you queue a run you can leave the device as *Any iOS device*, pick a
 specific device on a specific runner, or require labels, e.g. `ios-real` to run
@@ -1576,7 +1581,7 @@ when the runner last registered, or, before that, with the latest release.
 | Installed with | What `update` does |
 |---|---|
 | `.pkg`, `.exe`, install script, `.tar.gz` | Downloads the update archive for this OS and architecture, verifies it, unpacks it into `~/.leera-qa-runner/versions/<version>`, switches `versions/current` to it and restarts the background service if one is installed. No administrator rights needed; the two newest versions are kept |
-| npm | Prints `npm install -g @leera/qa-runner@<version>` (`@latest` without `--version`); runs it with `--yes` |
+| npm | Prints `npm install -g @leera.io/qa-runner@<version>` (`@latest` without `--version`); runs it with `--yes` |
 | Homebrew | Prints `brew upgrade --cask leera-qa-runner`; runs it with `--yes`. Homebrew always installs the cask's current version, so `--version` is ignored |
 | winget | Prints `winget upgrade --id Leera.QARunner --exact` (with `--version` when you pass one); runs it with `--yes` |
 | Docker | Prints the `docker pull` to run; recreate the container with the new tag |
@@ -1608,7 +1613,7 @@ platforms, `leera-qa-runner doctor`. On macOS, an update moves the runner's
 - **Remove the program:** `leera-qa-runner service uninstall`, then remove the
   install (`/usr/local/lib/leera-qa-runner` and the `/usr/local/bin` link on
   macOS; *Apps & features* on Windows; the unpacked directory on Linux;
-  `npm uninstall -g @leera/qa-runner`; `brew uninstall --cask leera-qa-runner`;
+  `npm uninstall -g @leera.io/qa-runner`; `brew uninstall --cask leera-qa-runner`;
   `winget uninstall Leera.QARunner`), and delete `~/.leera-qa-runner`, which
   also holds the versions `update` installed.
 
@@ -1708,6 +1713,13 @@ Run `sudo xcode-select -s /Applications/Xcode.app`, open Xcode once, and run
 not start a session".** WebDriverAgent was not prebuilt for this driver and
 Xcode version (for example after an Xcode update). Run `leera-qa-runner setup
 ios`; if the build fails, read `~/.leera-qa-runner/wda/<dir>.build.log`.
+
+**"the simulator … did not finish booting within 300s".** The Mac is slow to
+boot that simulator (common on busy CI hosts, for example stuck "Waiting on
+BackBoard"). The runner already retried once. Raise the limit with
+`leera-qa-runner config set ios.simulator_boot_timeout_secs 600` (or
+`RUNNER_IOS_BOOT_TIMEOUT_SECS`); the runner's log shows how long each boot
+attempt took.
 
 **"this build is an .ipa; simulators need a zipped .app …" / "this build is a
 simulator .app; real devices need an .ipa …".** The run's build does not fit
