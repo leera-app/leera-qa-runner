@@ -233,6 +233,82 @@ The install scripts can connect in the same step: `install.sh --version <v>
 
 ---
 
+## Set a runner up with a coding agent
+
+If you already have a coding agent connected to your workspace over MCP — the
+same connection it uses to write automation scripts, see
+[qa-automation-authoring.md](qa-automation-authoring.md) — it can do everything
+above on the machine it is running on: install the runner, mint its token,
+connect it, install what the platform needs, and check the result. You do not
+copy commands between the app and a terminal.
+
+On the **Test runners** page, open **How to install a runner** (or create a
+token) and use **Copy agent prompt** at the top of the panel. Choose what the
+machine will test — Web, Android, iOS or Desktop — and paste the prompt into the
+agent. The prompt is built from your own instance's settings, so it carries your
+URL, your CLI name and the pool you picked. **It never contains a token**, and
+pressing the button does not create one: the agent mints the token itself, so
+the secret goes straight from the server to the agent and is never on a
+clipboard.
+
+### The three tools the agent uses
+
+| Tool | What it is for |
+|---|---|
+| `workspace_get_runner_install` | Everything needed to install: the command for each operating system, the CLI's name, the version matching this instance, the documentation links, the pools a runner can join, what each platform needs installed first, and the steps in order. Read-only. Takes an optional `platform` and `pool_id` to narrow the answer |
+| `workspace_create_test_runner_token` | Mints a pool token and returns it with the connect and install commands. **Workspace administrators only.** Shown once |
+| `workspace_list_test_runners` | The connected machines, with operating system, version, online and busy state, labels, devices, and each one's setup report — which checks pass, which fail, and the fix command for the ones that do not. Read-only; pass `include_health: false` to leave the reports out |
+
+The agent should call `workspace_get_runner_install` before advising on runners
+at all, rather than repeating commands from memory: on a self-hosted or
+air-gapped instance the download URLs, the CLI's name and the documentation
+links can all point at your own mirrors.
+
+`workspace_queue_test_automation` also helps here. When it queues jobs that
+nothing in the pool can claim, its answer carries a `hint` naming
+`workspace_get_runner_install`, so an agent that finds a run sitting idle can
+see that the pool has no online runner for that platform and offer to connect
+one.
+
+### The token is a secret
+
+A pool token lets a machine claim automation jobs and receive the test accounts'
+passwords, so it is handled like any other credential. The rules are in the
+tool's own description and repeated in the `warning` it returns with every
+token, so an agent that reads only one of the two still gets them:
+
+- it is shown **once** and is never recoverable — a lost token is revoked and
+  replaced, not looked up;
+- give it to the CLI through the hidden prompt or `--token-stdin`, never as
+  `--token` on a command line, where it lands in the shell history and in the
+  process list;
+- never echo it, never print it back in chat, never write it into a file nobody
+  asked for, and never commit it.
+
+Only workspace administrators can mint one. An agent connected with anyone
+else's token gets `only workspace administrators can manage test runners` and
+nothing is created — the same rule, and the same message, as the button in the
+app. The other two tools are read-only and anyone with QA read access can call
+them.
+
+### What the agent should check when it is done
+
+Connecting is not the same as being ready. Once the runner is started, the agent
+should call `workspace_list_test_runners` and confirm:
+
+- the runner is there and `online`;
+- its `devices` include the platform you want to test;
+- its health report has no failing check. Each failing check carries a `fix`
+  command — usually `leera-qa-runner setup <platform>` — to run before looking
+  again.
+
+The first registration often carries no report at all: the checks run in the
+background and arrive with the next one, within five minutes. `health: null`
+means "not reported yet" (or a runner too old to send one), not "healthy". See
+[Doctor](#doctor) for what the checks are.
+
+---
+
 ## Start
 
 Run it in the foreground, for a first try or a one-off session:

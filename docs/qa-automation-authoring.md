@@ -62,6 +62,31 @@ MCP clients list the tools with the `workspace_` prefix. The server also accepts
 the same names with a `leera_` prefix (as older client configurations and the
 server's own design documents use them); both reach the same tools.
 
+### Setting a test runner up
+
+Scripts only run once a machine is connected to a pool, and the agent can do
+that itself on the machine it is running on:
+
+| Tool | Purpose |
+|---|---|
+| `workspace_get_runner_install` | The install command for each operating system, the CLI's name, the matching version, the docs links, the pools to join, and what each platform needs installed first |
+| `workspace_create_test_runner_token` | Mint a pool token, with the connect command to use it. Workspace administrators only; shown once |
+| `workspace_list_test_runners` | The connected machines with their devices, and each one's setup report: which checks pass, which fail, and the fix command for the ones that do not |
+
+Call `workspace_get_runner_install` before advising on runners rather than
+repeating commands from memory — a self-hosted instance's URLs, CLI name and
+docs links may point at its own mirrors. A minted token lets a machine claim
+jobs and receive the test accounts' passwords, so pass it to the CLI through
+`--token-stdin`, never echo or store it, and never commit it.
+
+`workspace_queue_test_automation` returns a `hint` naming
+`workspace_get_runner_install` when it queues jobs that no online runner in the
+pool can claim — which is what to read when a run is queued and nothing starts.
+
+The **Copy agent prompt** button on the Test runners page hands you a
+ready-made prompt for exactly this. See
+[test-runners.md](test-runners.md#set-a-runner-up-with-a-coding-agent).
+
 ---
 
 ## Script format
