@@ -58,9 +58,11 @@ The QA automation tools the agent then sees:
 | `workspace_get_test_run_item_debug` | A case's per-step debug log: console, page and network errors for web; device log lines and crashes for Android and iOS; as for web on Electron |
 | `workspace_cancel_test_automation` | Cancel a run's queued and running jobs, or one job |
 
-MCP clients list the tools with the `workspace_` prefix. The server also accepts
-the same names with a `leera_` prefix (as older client configurations and the
-server's own design documents use them); both reach the same tools.
+Every tool is named `workspace_*` — that is the name clients are given and the
+name the server registers it under, with no second internal spelling anywhere.
+Integrations saved before the rename hold `leera_*` identifiers; those are still
+accepted and reach the same tools, but nothing the server sends back ever uses
+them.
 
 ### Setting a test runner up
 
@@ -72,6 +74,17 @@ that itself on the machine it is running on:
 | `workspace_get_runner_install` | The install command for each operating system, the CLI's name, the matching version, the docs links, the pools to join, and what each platform needs installed first |
 | `workspace_create_test_runner_token` | Mint a pool token, with the connect command to use it. Workspace administrators only; shown once |
 | `workspace_list_test_runners` | The connected machines with their devices, and each one's setup report: which checks pass, which fail, and the fix command for the ones that do not |
+
+Administering the pools themselves — workspace administrators only:
+
+| Tool | Purpose |
+|---|---|
+| `workspace_create_test_runner_pool` | Add a pool for a group of machines |
+| `workspace_update_test_runner_pool` | Rename a pool or change its description |
+| `workspace_delete_test_runner_pool` | Delete a pool with its tokens, runners and job history; refused while it has queued or running jobs |
+| `workspace_list_test_runner_tokens` | A pool's tokens with name, kind, project, when made and when last used — metadata only, never a secret |
+| `workspace_revoke_test_runner_token` | Stop a token working; its runner entries go with it |
+| `workspace_delete_test_runner` | Forget a machine that is gone for good; refused while it runs a job or holds a device session |
 
 Call `workspace_get_runner_install` before advising on runners rather than
 repeating commands from memory — a self-hosted instance's URLs, CLI name and

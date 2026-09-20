@@ -42,6 +42,18 @@ over MCP — see [qa-automation-authoring.md](qa-automation-authoring.md).
   when it can drive Tauri apps; `windows` and `macos` when it can drive native
   Windows or macOS apps). A job is
   only claimed by a runner whose labels cover what the job needs.
+- **Your own labels.** A machine can also carry labels you give it, which is how
+  you send a run to one machine rather than to whichever runner is free:
+
+  ```bash
+  leera-qa-runner config set labels.extra my-laptop
+  ```
+
+  The label then appears in **Run only on** when you queue a run, and only a
+  runner carrying it takes those jobs. Use it whenever the environment is
+  reachable from one machine alone — a site on `localhost`, or a host behind a
+  VPN — because otherwise a runner that cannot reach it can claim the job and
+  fail. It works for every platform, web included.
 - **Platforms and devices.** A test run has a platform (web, Android, iOS,
   Electron, Tauri, Windows or macOS), chosen when the run is created. A runner
   only claims a run's jobs when it has a free device of that platform: its
@@ -258,6 +270,30 @@ clipboard.
 | `workspace_get_runner_install` | Everything needed to install: the command for each operating system, the CLI's name, the version matching this instance, the documentation links, the pools a runner can join, what each platform needs installed first, and the steps in order. Read-only. Takes an optional `platform` and `pool_id` to narrow the answer |
 | `workspace_create_test_runner_token` | Mints a pool token and returns it with the connect and install commands. **Workspace administrators only.** Shown once |
 | `workspace_list_test_runners` | The connected machines, with operating system, version, online and busy state, labels, devices, and each one's setup report — which checks pass, which fail, and the fix command for the ones that do not. Read-only; pass `include_health: false` to leave the reports out |
+
+### Administering pools, tokens and runners
+
+Six more tools cover the housekeeping around a pool. All of them are
+**workspace administrators only** — the check is the same one the web UI and the
+REST routes use.
+
+| Tool | What it is for |
+|---|---|
+| `workspace_create_test_runner_pool` | Add a pool: a team's laptops, a site's device lab, a set of build agents. Check the existing pools first — an extra pool with no runner in it is somewhere runs can be queued and never picked up |
+| `workspace_update_test_runner_pool` | Rename a pool or change its description. This is all that is editable; the pool keeps its id, its tokens and its runners |
+| `workspace_delete_test_runner_pool` | Delete a pool for good. Takes its tokens, runner entries, device sessions and the automation job record of every run that used it — the runs and their per-case results are kept, the job history behind them is not. Refused while the pool has queued or running jobs, and refused for the built-in pool while the built-in runner is on |
+| `workspace_list_test_runner_tokens` | A pool's tokens: name, kind, project, when created and when a machine last used one. **Metadata only** — a token's secret is stored hashed and can never be read back, by this tool or any other |
+| `workspace_revoke_test_runner_token` | Stop a token being usable. The machine holding it can no longer claim jobs or receive test accounts' passwords, and its runner entries go with it. Cannot be undone |
+| `workspace_delete_test_runner` | Forget the entry for a machine that is gone for good. Refused while the runner is running a job or holds a device session. Its finished jobs and their results are kept; they simply stop naming a machine |
+
+A runner that is merely offline is not a runner to delete: it comes back on its
+own next heartbeat, and one that reconnects with the same token and name
+reappears anyway.
+
+**Moving a machine to another pool is not an edit.** A runner's pool comes from
+the token it connected with, and job claims are scoped by the pool the token
+names. To move a machine, revoke its token, mint one for the other pool, and
+reconnect it there.
 
 The agent should call `workspace_get_runner_install` before advising on runners
 at all, rather than repeating commands from memory: on a self-hosted or
@@ -948,7 +984,8 @@ device:
 **One desktop app job at a time** per runner (Electron, Tauri, Windows or macOS app): the app's windows share one desktop.
 When you queue a run you can leave the device open or pick a specific runner's
 machine, which also fixes the operating system. To keep builds for one
-operating system on matching runners, give each operating system its own pool.
+operating system on matching runners, give those machines a label of their own
+and pick it under **Run only on**, or give each operating system its own pool.
 
 ### Electron app builds
 
@@ -1152,9 +1189,10 @@ The machine is advertised only when the runner can actually drive Tauri apps:
 A runner that does not advertise the device never claims Tauri jobs; they stay
 queued for another runner. **One desktop app job at a time** per runner: a
 Tauri job waits while the same runner runs an Electron job, and the reverse. As with
-Electron, a build runs only on the operating system it was built for: give
-each operating system its own pool, or pick a specific runner's machine when
-you queue the run.
+Electron, a build runs only on the operating system it was built for: label
+those machines and pick the label under **Run only on**, give each operating
+system its own pool, or pick a specific runner's machine when you queue the
+run.
 
 ### Tauri app builds
 

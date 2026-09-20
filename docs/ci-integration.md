@@ -139,8 +139,9 @@ running.
 **Which runners take the jobs.** Jobs of a local build (`--build` without
 `--upload-build`) are pinned to the `ci` command's runner and never run anywhere
 else. Web jobs and jobs of uploaded builds can also be claimed by other online
-runners in the same pool; give CI tokens a pool of their own when every job
-should run on the CI machine.
+runners in the same pool; label the CI machine and pick that label under **Run
+only on**, or give CI tokens a pool of their own, when every job should run on
+the CI machine.
 
 ---
 
