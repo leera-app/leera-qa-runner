@@ -40,7 +40,8 @@ over MCP — see [qa-automation-authoring.md](qa-automation-authoring.md).
   `android-real` for its Android devices; `ios`, `ios-simulator` and `ios-real`
   for its iOS devices; `electron` when it can drive Electron apps; `tauri`
   when it can drive Tauri apps; `windows` and `macos` when it can drive native
-  Windows or macOS apps). A job is
+  Windows or macOS apps; `data-refs` when it can fill
+  [test data](#test-data-and-the-data-refs-label) placeholders). A job is
   only claimed by a runner whose labels cover what the job needs.
 - **Your own labels.** A machine can also carry labels you give it, which is how
   you send a run to one machine rather than to whichever runner is free:
@@ -399,6 +400,108 @@ Services start without your shell profile, so `service install` records the
 `PLAYWRIGHT_BROWSERS_PATH` and proxy variables it sees into the config file's
 `env` section. Re-run `service install` after changing those (for example after
 installing the Android SDK).
+
+---
+
+## Following a run
+
+A run's page (**QA → Test runs**, then the run) has two tabs:
+
+- **Test cases** is the default, and existing links open it. It is the
+  execution workspace: the case navigator, steps, evidence, notes and verdicts,
+  plus each automated step's screenshots, video and debug log.
+- **Overview** (`?view=overview` on the run's URL) shows the whole run at once,
+  whether its cases are automated, manual or both.
+
+The Overview has four parts:
+
+- **Summary**: the run's status, environment, platform, CI branch and commit,
+  the app builds its jobs used, and who started it. Result counts (completed,
+  passed, failed, pending, and cases running or in progress) with a progress
+  bar. Elapsed time and hands-on time, how fresh the page's data is, and how
+  many testers are active.
+- **Evidence panel**: one card per case with its status, whether a person, a
+  runner or both worked on it, and what evidence it has. Filter it to failures
+  or to cases with evidence. Thumbnails load only for cards on screen, and
+  videos do not preload.
+- **Execution canvas**: one lane per case. A lane shows setup (the runner's
+  launch for an automated case, or the case's preconditions), each step,
+  cleanup (the runner uploading evidence, which still happens after a failed
+  step) and the result. Group lanes by module or assignee, search, filter by
+  status, zoom, fit the run to the view and use the minimap. **Follow active**
+  keeps the steps being worked on in view; panning or zooming turns it off.
+- **Step inspector**: select a case or step to see its status, the expected and
+  actual result, and who recorded it or which runner and device ran it. It also
+  shows timing (a step's duration only when both its start and end were
+  recorded) and network requests with method, URL, status and duration
+  (request and response bodies are not recorded). Logs, evidence and the
+  recording follow. **Open test case** switches to the Test cases tab on that
+  case.
+
+Switching tabs keeps unsaved notes, uploads in progress and the case you had
+open. The execution timer pauses while the Overview is showing.
+
+### Who is testing what
+
+Opening or reading a case does not mark it as being tested. To show the team
+which case you are working on, press **Start testing** in the Test cases tab.
+On a case still waiting for a result, your first recording action also starts
+a session: marking or clearing a step, attaching evidence, or editing the
+notes. Recording a verdict on its own does not. On a case that already has a
+result, recording does not start a session: press **Retest** first, otherwise
+your change corrects the latest attempt.
+
+- You work on one case per run at a time; starting another ends the previous
+  session. Several people can work on the same case. Nothing is locked: anyone
+  who can execute the project's test runs can still edit any case, and a
+  session never changes who a case is assigned to.
+- While your session is open, the page reports it every 30 seconds, even from a
+  hidden browser tab. Others see you as working, with your current step once
+  you mark a step or attach evidence to one. After 2 minutes without a report
+  you show as idle ("Last active …"). After 30 minutes the session is listed
+  only in the step inspector.
+- A session ends when you press **Stop**, when anyone records a result for the
+  case, when you start another case, or when the run is completed. A completed
+  run takes no new sessions. Reloading the page within 2 minutes carries the
+  session on; after that the page offers **Resume testing** and reports nothing
+  until you resume.
+- **Presence never changes a result.** No timeout, idle state or lost
+  connection passes, fails, blocks, skips or completes a case.
+
+### Attempts
+
+Each time a case settles on a result, Leera keeps that outcome as an attempt.
+An attempt holds the result, step results, evidence and notes, who or which
+runner recorded it, and its timing.
+
+- A new attempt is added when a pending case gets a result, including a case
+  reset to pending and recorded again. One is also added when a settled case is
+  re-tested: someone presses **Retest** (starting a session on it) after its
+  last result, or a person records a result over a runner's.
+- Changing a result without re-testing, for example to fix a mis-click,
+  updates the latest attempt instead of adding one.
+- A retry never overwrites an earlier attempt's results or recordings. Pick an
+  attempt in the step inspector to see its steps, evidence and recording.
+- Counts use each case's latest result, so a retried case is counted once.
+- Cases that settled before attempts were introduced have no attempt history.
+
+### Live updates
+
+Like the run itself, its Overview and live updates are for people with a role
+in the run's project, and for workspace administrators.
+
+The page receives changes over the instance's WebSocket connection as they
+happen: testers starting and stopping work, results and evidence recorded in
+the app, and runner progress. It also checks the run in the background every
+30 seconds, every 10 seconds while the connection is down, and at once after it
+reconnects. The check pauses while the browser tab is hidden and runs as soon
+as the tab is visible again. Changes made through MCP are not pushed, so they
+appear with that check, usually within 30 seconds. When the page has not
+synced for 45 seconds, the summary says so ("Updated … ago").
+
+Realtime delivery comes from a hub inside the API process, which is why an
+instance runs a single API replica; see
+[configuration](self-hosting/configuration.md#things-that-are-deliberately-fixed).
 
 ---
 
@@ -1082,10 +1185,17 @@ What the app gets:
 
 ### Electron video and logs
 
-- **Video** is WebM, recorded from the app's window as for web runs. It needs
-  nothing else, but it is not recorded when the app had to be started with the
-  DevTools-port fallback above. A runner that only offers Electron still
-  advertises WebM video and step debug logs.
+- **Video** is WebM, recorded from the first window the app opens, as for web
+  runs; it ends if that window closes (a splash screen, say) while the app runs
+  on. It needs nothing else, but it is not recorded when the app had to be
+  started with the DevTools-port fallback above. A runner that only offers
+  Electron still advertises WebM video and step debug logs.
+- **Restarts.** A script that restarts the app (`launch` again, or `terminate`
+  then `launch`) records each start separately, and the run keeps the last
+  recording, so the video shows how the case ended. Steps that ran before that
+  restart have no place in it (no **Watch this step**); the step that restarted
+  the app plays from the start of the video. A restart that needed the
+  DevTools-port fallback is not recorded, so the recording before it is kept.
 - **Debug log.** As for web runs: the focused window's console errors and
   warnings, page errors and network requests, per step, with credential values
   redacted.
@@ -1674,6 +1784,33 @@ templates are described in [Running automated tests from CI](ci-integration.md).
 
 ---
 
+## Test data and the `data-refs` label
+
+Scripts can read [test data](qa-test-data.md) and a few newer values:
+`{{data.<reference>.<field>}}`, `{{env.api_base_url}}`, `{{job.tag}}`,
+`{{job.id}}`, `{{job.attempt}}`, `{{item.id}}`, `{{date.today}}` and
+`{{now.iso}}`. `{{random.email}}` counts too on an environment with a random
+e-mail domain, because older runners ignore the domain. A runner released with
+test data support reports it when it registers, and the server gives it the
+**`data-refs`** label. You do not add the label yourself.
+
+A job whose script uses any of those placeholders requires `data-refs`, so an
+older runner never claims it. The job stays queued until a runner in the pool
+has the label: [update](#updating) the pool's runners, and restart any runner
+you started by hand so it registers again. Jobs whose scripts use none of them
+run on older runners as before.
+
+With the job, the runner receives the environment's API base URL, its random
+e-mail domain and whether it is marked test or production, the job's tag, and
+the fields of each test data value the case declares. Test data values are not
+secrets: treat them as visible to anyone who can see the run's results,
+screenshots and video. Device sessions receive no test data. A session on a
+runner without the label also refuses `{{env.api_base_url}}`,
+`{{date.today}}`, `{{now.iso}}`, and `{{random.email}}` on an environment with
+a random e-mail domain.
+
+---
+
 ## Updating
 
 Runner and server share one version number. The Test runners page marks runners
@@ -1735,10 +1872,13 @@ platforms, `leera-qa-runner doctor`. On macOS, an update moves the runner's
 
 - **What a runner can do.** Claim jobs from its own pool, and record their
   results, evidence and logs. It cannot read other projects, tickets or users.
-- **What it receives.** The test script, the environment's base URL, for
+- **What it receives.** The test script, the environment's base URL, API base
+  URL, random e-mail domain and protection, for
   app platforms the app's id and a short-lived download link for the app build
-  (or, for desktop apps, the path of the app on the runner), and, when a run
-  is queued with a QA credential, that account's **username and password**.
+  (or, for desktop apps, the path of the app on the runner), the fields of the
+  [test data](qa-test-data.md) values the case declares (never secrets), and,
+  when a run is queued with a QA credential, that account's **username and
+  password**.
   Treat a runner machine like any place those accounts could be used from, and
   revoke the token if the machine is compromised.
 - **Secrets in results.** Credential values are redacted from step notes and
@@ -1785,7 +1925,8 @@ runner version. [Update](#updating) the runner.
 **Jobs stay queued.** Check that a runner in the *same pool* is online and
 idle, and that its labels include what the job needs (`web-chromium` for web
 jobs, `android` for Android jobs, `ios` for iOS jobs, `electron` for Electron
-jobs, `tauri` for Tauri jobs, `windows` and `macos` for native app jobs), and
+jobs, `tauri` for Tauri jobs, `windows` and `macos` for native app jobs, and
+`data-refs` for jobs whose script uses [test data or the other newer placeholders](#test-data-and-the-data-refs-label)), and
 — for every platform but web — that one of its devices is free
 (a device in a live session is busy).
 `leera-qa-runner doctor --platform <platform>` explains a missing label.

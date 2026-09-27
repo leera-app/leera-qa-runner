@@ -51,9 +51,9 @@ The QA automation tools the agent then sees:
 | `workspace_device_session_snapshot` | Screenshot and element tree of the session's current screen |
 | `workspace_device_session_action` | Run one action in the session; returns the new screen and the action to save |
 | `workspace_end_device_session` / `workspace_list_device_sessions` | End a session; list sessions |
-| `workspace_get_test_run_credential_plan` | Which account each sign-in role will use in a run, and which cases would be skipped |
+| `workspace_get_test_run_credential_plan` | Which account each sign-in role will use in a run, which value each [test data](qa-test-data.md) reference will use (and which values could be picked instead), and which cases would be skipped |
 | `workspace_start_test_run` | Create a run; `platform` chooses web, android, ios, electron, tauri, windows or macos |
-| `workspace_queue_test_automation` | Queue a run's pending cases that have a script for the run's platform, optionally with a build, a device and video |
+| `workspace_queue_test_automation` | Queue a run's pending cases that have a script for the run's platform, optionally with a build, a device, video and a picked value per test data reference (`data_overrides`) |
 | `workspace_list_test_automation_jobs` | Job status, platform, device, build, verdicts and failed steps with the reason |
 | `workspace_get_test_run_item_debug` | A case's per-step debug log: console, page and network errors for web; device log lines and crashes for Android and iOS; as for web on Electron |
 | `workspace_cancel_test_automation` | Cancel a run's queued and running jobs, or one job |
@@ -180,15 +180,39 @@ A target names **exactly one** locator of its platform. Optional on any target:
 | `{{app.id}}` | The app's package name (Android), bundle id (iOS, macOS), app id (Electron and Tauri, optional) or AppUserModelID or executable name (Windows) from the environment, e.g. `com.example.app` | android, ios, electron, tauri, windows, macos |
 | `{{credential.username}}` | Username of the QA credential the run uses for the case's role | all |
 | `{{credential.password}}` | Its password. **Only allowed as the `value` of `fill` (web, Electron, Tauri) or `type` (Android, iOS, Windows, macOS)**, so it can never end up in a URL, an assertion message or a log | all |
-| `{{random.email}}` | A random address, the same everywhere within one job | all |
+| `{{random.email}}` | A random address, the same everywhere within one job. It uses the environment's random e-mail domain, or `example.com` when it has none; with a domain, the job needs a runner with the `data-refs` label | all |
 | `{{random.string}}` | A random 12-character string, stable within a job | all |
 | `{{random.number}}` | A random 6-digit number, stable within a job | all |
-| `{{run.id}}` | The test run's id | all |
+| `{{run.id}}` | The test run's id, the same for every item of the run | all |
+| `{{data.<reference>.<field>}}` | A field of a [test data](qa-test-data.md) reference's value on the run's environment. `{{data.<reference>}}` reads the field named `value` | all |
+| `{{env.api_base_url}}` | The environment's API base URL, as the runner machine reaches it | all |
+| `{{job.tag}}` | A tag unique to this attempt of this run item, `qa-r<run>-i<item>-a<attempt>-<6 random letters and digits>` | all |
+| `{{job.id}}` / `{{job.attempt}}` | The automation job's id; the attempt number, from 1 | all |
+| `{{item.id}}` | The run item's id | all |
+| `{{date.today}}` / `{{now.iso}}` | Today's date (`YYYY-MM-DD`) and the current time (ISO 8601), both in UTC | all |
 
 A script that uses `{{credential.*}}` **signs in**: the case needs a sign-in
 role, and that role needs an account with a password — one for the run's
 environment, or one not tied to an environment — or the case is skipped when
 queued.
+
+A script that uses `{{data.*}}` **reads test data**: the case must declare each
+reference it reads, and the reference needs a value for the run's environment
+(or, on environments marked test, for any environment) unless a value is
+picked for the run; otherwise the case is skipped when queued. A `goto` or
+`deep_link` URL may start with a data placeholder. See
+[Test data](qa-test-data.md) for declaring references, setting values and the
+skip messages.
+
+Jobs whose script uses `{{data.*}}`, `{{env.api_base_url}}`, `{{job.*}}`,
+`{{item.id}}`, `{{date.today}}` or `{{now.iso}}`, or `{{random.email}}` on an
+environment with a random e-mail domain, are only claimed by runners with the
+`data-refs` label, which up-to-date runners get automatically
+([Test runners](test-runners.md#test-data-and-the-data-refs-label)). A device
+session has no test data: it cannot fill `{{data.*}}`, `{{job.*}}` or
+`{{item.id}}`, and on a runner without the `data-refs` label it also refuses
+`{{env.api_base_url}}`, `{{date.today}}`, `{{now.iso}}` and, with a random
+e-mail domain, `{{random.email}}`.
 
 ---
 
@@ -439,7 +463,8 @@ as for web.
 
 - **Start the first step with `launch {}`**, so every run begins from a freshly
   started app. `terminate {}` followed by `launch {}` restarts it within a
-  script.
+  script; the case video then shows the app from its last start (see
+  [Electron video](test-runners.md#electron-video-and-logs)).
 - **Windows.** Actions work on the focused window, which is the app's first
   window after `launch`. When an action opens another window (preferences, an
   about box, a second document), add `focus_window` before acting on it, and
@@ -799,14 +824,29 @@ For each automated step the runner records:
   the device was not ready, the app build was missing or could not be installed,
   a placeholder had no value, or the job ran past its time limit.
 
-Every step also gets a debug log — for web, console errors and warnings, page
-errors and network requests; for Android, the app's logcat warnings and errors
-and any crash; for iOS, the app's error and fault log lines and, on simulators,
-any crash report; for Electron, as for web, from the focused window; for
-Windows and macOS apps, the Appium log of failed steps — and a run can be
-queued with video `off`, `on_failure` or `always` (WebM for web and Electron,
-MP4 for Android, H.264 video for iOS; Windows and macOS apps only on runners
-with ffmpeg; Tauri runs record no video).
+A step also gets a debug log when the runner captured something while it ran —
+for web, console errors and warnings, page errors and network requests; for
+Android, the app's logcat warnings and errors and any crash; for iOS, the app's
+error and fault log lines and, on simulators, any crash report; for Electron,
+as for web, from the focused window; and, on Android, iOS, Windows and macOS,
+the Appium log of a failed or blocked step.
+
+A run can be queued with video `off`, `on_failure` or `always` (WebM for web
+and Electron, MP4 for Android, H.264 video for iOS; Windows and macOS apps only
+on runners with ffmpeg; Tauri runs record no video). `on_failure` keeps the
+video only when a step did not pass, and a video over 50 MB is not kept. While
+a video is recorded, the runner notes where each step starts in it, so when the
+case's video is kept the run page offers **Watch this step** on every step that
+ran, including steps that logged nothing. An Electron script that restarts the
+app keeps only the last recording, so steps before the restart are not in it
+(see [test runners](test-runners.md)).
+
+People read these results on the run page. The **Test cases** tab shows each
+step's note, screenshots, video and debug log. The **Overview** tab shows the
+whole run, with each case's attempts, so a rerun keeps the earlier attempt's
+results and evidence. Changes made through MCP are not pushed to open run
+pages; they appear with the page's background check, usually within 30
+seconds. See [Following a run](test-runners.md#following-a-run).
 
 ---
 
@@ -820,19 +860,34 @@ A typical session with a coding agent that has the application's source open:
 2. **Find stable locators.** The agent reads the UI code for labels, roles and
    `data-testid`s (or adds test ids where there are none), and checks routes for
    `goto` URLs.
-3. **Draft and validate.** It writes the script and calls
+3. **Declare the data first.** When a step needs a particular record (an
+   overdue customer, an expired subscription), the agent declares a
+   [test data](qa-test-data.md) reference on the case with
+   `update_test_case` (`data.refs`), and sets `data.mutates: true` when the
+   case creates, changes or deletes data. The server does not look at the
+   script to decide this: a case without `mutates: true` counts as read-only
+   and can run on production. Do this before validating: the script may only
+   read references its case declares.
+4. **Draft and validate.** It writes the script and calls
    `validate_test_automation` until `valid` is true, fixing the reported path
    (e.g. `automation.steps[1].actions[0].target needs exactly one of …`).
    `manual_steps` shows which steps are still left for a person — intended for
    steps a script cannot check.
-4. **Save.** `save_test_automation`.
-5. **Run it.** Create (or reuse) a test run on the right environment, check
-   `get_test_run_credential_plan` when the script signs in, pick a pool with an
-   online runner from `list_test_runner_pools`, and `queue_test_automation`
-   (with `video: "on_failure"` while iterating).
-6. **Read the results.** Poll `list_test_automation_jobs` until the jobs finish.
+5. **Save.** `save_test_automation`.
+6. **Run it.** Create (or reuse) a test run on the right environment, check
+   `get_test_run_credential_plan` when the script signs in or reads test data
+   (its `data` section shows the value each reference will use, the values
+   that could be picked instead, the references with no value on the
+   environment, and the cases protection or a missing API base URL will skip),
+   pick a pool with an online runner from `list_test_runner_pools`, and
+   `queue_test_automation` (with `video: "on_failure"` while iterating, and
+   `data_overrides` only when a reference should use a value other than the
+   automatic match, or has none; a picked value is used on any environment,
+   production included, but a case that changes data is still skipped on
+   production).
+7. **Read the results.** Poll `list_test_automation_jobs` until the jobs finish.
    For a failed step, read the note, then `get_test_run_item_debug` for console
-   and network errors. Fix the script (or the application) and repeat from 3.
+   and network errors. Fix the script (or the application) and repeat from 4.
 
 ---
 
@@ -866,9 +921,15 @@ that worked into the script. How runners handle sessions is described in
    ref replaced by its target. Coordinate taps are marked as not saveable. Refs
    belong to the last snapshot; after the screen changes, take a new one.
 5. **Repeat** until the case's steps are covered, collecting the `applied`
-   actions under their step indexes.
+   actions under their step indexes. A session has no test data and no job, so
+   it refuses `{{data.*}}`, `{{job.*}}` and `{{item.id}}` (and, on a runner
+   without the `data-refs` label, `{{env.api_base_url}}`, `{{date.today}}`,
+   `{{now.iso}}` and `{{random.email}}` with a random e-mail domain): type the
+   literal value while exploring, then replace it with the placeholder in the
+   script.
 6. **Validate and save.** `validate_test_automation`, then
-   `save_test_automation`.
+   `save_test_automation`. Declare the case's [test data](qa-test-data.md)
+   references before validating a script that reads them.
 7. **End the session** with `end_device_session` so the device is free for jobs
    (it also ends by itself after 10 idle minutes, or 60 minutes in total).
 8. **Run it.** `start_test_run` with the platform (or reuse a run),
@@ -974,7 +1035,13 @@ credential's value on the device, and results redact it.
 - Save the `target` from `applied` rather than writing one by hand. When a
   snapshot marks a suggestion *fragile*, add a content description or id in the
   app instead.
-- Make data unique with `{{random.*}}` so runs do not collide.
+- Use `{{job.tag}}` or `{{job.id}}` in anything a script creates that must be
+  unique: parallel items and retries never share them, and the tag names the
+  run and item that made the record. Use `{{random.*}}` when a value must be
+  unpredictable; it is not guaranteed to differ between jobs, and `{{run.id}}`
+  is shared by every item of a run.
+- Point at existing records through [test data](qa-test-data.md) references
+  rather than ids pasted into the script, so each environment can have its own.
 - Wait on conditions (`wait_for`, `expect_visible`) rather than `wait`; give the
   first check on a screen that loads data a longer `timeout_ms`.
 - Never paste real passwords into a script; use a QA credential and
