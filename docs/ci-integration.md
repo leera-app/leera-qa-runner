@@ -619,8 +619,8 @@ the driver is, and pass the portable executable Cargo builds:
 ```
 
 Cache `~/.cargo/bin` (keyed on the `tauri-driver` version) to skip the
-`cargo install` on later runs. Tauri runs record no video; `--video` has no
-effect for them.
+`cargo install` on later runs. With `--video`, a Tauri run records the Xvfb
+display the runner starts (the runner downloads ffmpeg for it on first use).
 
 ### Native Windows and macOS apps in CI
 
@@ -688,8 +688,10 @@ image:
           RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
 ```
 
-Video needs `ffmpeg` on the machine (and, on macOS, Screen Recording
-permission); without it `--video` has no effect for these platforms.
+With `--video`, the runner records the screen with ffmpeg, which it downloads
+when none is installed. On macOS recording also needs Screen Recording
+permission for the job's process, which hosted macOS runners may not grant;
+without it `--video` has no effect there.
 
 ### Other CI systems
 

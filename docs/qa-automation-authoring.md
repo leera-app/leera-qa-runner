@@ -180,6 +180,7 @@ A target names **exactly one** locator of its platform. Optional on any target:
 | `{{app.id}}` | The app's package name (Android), bundle id (iOS, macOS), app id (Electron and Tauri, optional) or AppUserModelID or executable name (Windows) from the environment, e.g. `com.example.app` | android, ios, electron, tauri, windows, macos |
 | `{{credential.username}}` | Username of the QA credential the run uses for the case's role | all |
 | `{{credential.password}}` | Its password. **Only allowed as the `value` of `fill` (web, Electron, Tauri) or `type` (Android, iOS, Windows, macOS)**, so it can never end up in a URL, an assertion message or a log | all |
+| `{{credential.otp}}` | Its fixed one-time code, for apps that ask for a code after the password ([two-step sign-in](#two-step-sign-in)). Allowed where `{{credential.password}}` is; the job needs a runner with the `credential-otp` label | all |
 | `{{random.email}}` | A random address, the same everywhere within one job. It uses the environment's random e-mail domain, or `example.com` when it has none; with a domain, the job needs a runner with the `data-refs` label | all |
 | `{{random.string}}` | A random 12-character string, stable within a job | all |
 | `{{random.number}}` | A random 6-digit number, stable within a job | all |
@@ -194,7 +195,8 @@ A target names **exactly one** locator of its platform. Optional on any target:
 A script that uses `{{credential.*}}` **signs in**: the case needs a sign-in
 role, and that role needs an account with a password — one for the run's
 environment, or one not tied to an environment — or the case is skipped when
-queued.
+queued. A script that uses `{{credential.otp}}` also needs that account to have
+a one-time code, or the case is skipped with `"<account>" has no one-time code yet`.
 
 A script that uses `{{data.*}}` **reads test data**: the case must declare each
 reference it reads, and the reference needs a value for the run's environment
@@ -213,6 +215,36 @@ session has no test data: it cannot fill `{{data.*}}`, `{{job.*}}` or
 `{{item.id}}`, and on a runner without the `data-refs` label it also refuses
 `{{env.api_base_url}}`, `{{date.today}}`, `{{now.iso}}` and, with a random
 e-mail domain, `{{random.email}}`.
+
+### Two-step sign-in
+
+Some apps ask for a one-time code after the password. Automation cannot read a
+code sent by e-mail, text message or an authenticator app, so the app under test
+has to accept a **fixed code** for the test accounts that automation uses:
+
+1. In the app under test, accept a fixed code only on test environments and
+   only for an allowlist of test accounts. Configure the code on the server
+   rather than writing it into the app's source code, and make sure production
+   never accepts it. Several sign-in providers support this already, for
+   example test phone numbers with a fixed verification code.
+2. On the project's **Credentials** page, edit the account and enter the code
+   under **One-time code**. It is encrypted like the password and shown only
+   when someone reveals the account.
+3. Type it with `{{credential.otp}}` in the step that asks for the code:
+
+```json
+{ "index": 1, "actions": [
+    { "type": "fill", "target": { "label": "Verification code" }, "value": "{{credential.otp}}" },
+    { "type": "click", "target": { "role": "button", "name": "Verify" } }
+]}
+```
+
+Jobs whose script uses `{{credential.otp}}` are only claimed by runners with the
+`credential-otp` label, which up-to-date runners get automatically
+([Test runners](test-runners.md#two-step-sign-in-and-the-credential-otp-label)).
+The code is redacted from step notes and debug logs like the password. Codes
+shorter than 4 characters are not redacted, because they would mangle ordinary
+text; use a longer code.
 
 ---
 
@@ -488,7 +520,11 @@ Tauri scripts use the same actions as [Electron](#electron-actions): the
 `launch {args?}`, `terminate {}`, `focus_window {title | index}`, and the
 [shared actions](#shared-actions). They run on Linux and Windows runners, and on
 a Mac only for builds with the embedded WebDriver plugin (see
-[Tauri](test-runners.md#tauri)).
+[Tauri](test-runners.md#tauri)). On a Mac the plugin simulates key presses and
+pointer moves with JavaScript events: check
+[Tauri known limitations](test-runners.md#tauri-known-limitations) before a
+script relies on key chords, Home or End, hover menus or `focus_window` by
+index there.
 
 ### Tauri targets
 
@@ -562,8 +598,9 @@ frontend can be served on its own):
   settings and files persist between launches, and each operating system's
   build behaves the same.
 
-Tauri runs record no video, and elements outside the web view (native menus,
-file dialogs, notifications, the tray) cannot be reached from a script.
+A Tauri run's video is a recording of the runner's screen, and elements outside
+the web view (native menus, file dialogs, notifications, the tray) cannot be
+reached from a script.
 
 ### Tauri app state and builds
 
@@ -832,8 +869,8 @@ as for web, from the focused window; and, on Android, iOS, Windows and macOS,
 the Appium log of a failed or blocked step.
 
 A run can be queued with video `off`, `on_failure` or `always` (WebM for web
-and Electron, MP4 for Android, H.264 video for iOS; Windows and macOS apps only
-on runners with ffmpeg; Tauri runs record no video). `on_failure` keeps the
+and Electron, MP4 for Android, H.264 video for iOS, and an MP4 of the runner's
+screen for Tauri, Windows and macOS apps). `on_failure` keeps the
 video only when a step did not pass, and a video over 50 MB is not kept. While
 a video is recorded, the runner notes where each step starts in it, so when the
 case's video is kept the run page offers **Watch this step** on every step that
@@ -1044,5 +1081,5 @@ credential's value on the device, and results redact it.
   rather than ids pasted into the script, so each environment can have its own.
 - Wait on conditions (`wait_for`, `expect_visible`) rather than `wait`; give the
   first check on a screen that loads data a longer `timeout_ms`.
-- Never paste real passwords into a script; use a QA credential and
-  `{{credential.password}}`.
+- Never paste real passwords or one-time codes into a script; use a QA
+  credential with `{{credential.password}}` and `{{credential.otp}}`.

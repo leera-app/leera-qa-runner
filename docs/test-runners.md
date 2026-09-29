@@ -41,7 +41,9 @@ over MCP — see [qa-automation-authoring.md](qa-automation-authoring.md).
   for its iOS devices; `electron` when it can drive Electron apps; `tauri`
   when it can drive Tauri apps; `windows` and `macos` when it can drive native
   Windows or macOS apps; `data-refs` when it can fill
-  [test data](#test-data-and-the-data-refs-label) placeholders). A job is
+  [test data](#test-data-and-the-data-refs-label) placeholders; `credential-otp`
+  when it can type an account's
+  [one-time code](#two-step-sign-in-and-the-credential-otp-label)). A job is
   only claimed by a runner whose labels cover what the job needs.
 - **Your own labels.** A machine can also carry labels you give it, which is how
   you send a run to one machine rather than to whichever runner is free:
@@ -615,7 +617,7 @@ fails (warnings do not count). `--platform` accepts `web`, `android`, `ios`,
 
 `start`, `connect`, `doctor [--platform web|android|ios|electron|tauri|windows|macos]`,
 `setup browsers`, `setup android`, `setup ios`, `setup electron`,
-`setup tauri`, `setup windows [--install]`, `setup macos`, `ci`,
+`setup tauri`, `setup windows [--install]`, `setup macos`, `setup ffmpeg`, `ci`,
 `builds upload`, `service install|uninstall|start|stop|restart|status|logs`,
 `config get|set|unset|list|path|set-token`, `update [--check] [--version X] [--yes]`
 (see [Updating](#updating)) and `version [--json]`. Every command prints its
@@ -625,7 +627,8 @@ options with `--help`.
 with the runner) and exits `0`; on Linux without `DISPLAY` it reminds you to
 install Xvfb. `setup tauri`, `setup windows` and `setup macos` are described
 under [Set up Tauri](#set-up-tauri), [Set up Windows apps](#set-up-windows-apps)
-and [Set up macOS apps](#set-up-macos-apps). Not available yet: `setup all`
+and [Set up macOS apps](#set-up-macos-apps), and `setup ffmpeg` under
+[Video recording](#video-recording). Not available yet: `setup all`
 exits `2` with "not available in this runner version", `doctor --platform
 linux` exits `2` with "this runner version cannot run … jobs" (native Linux
 apps are not supported), and there is no `devices` command. `setup
@@ -647,6 +650,49 @@ meantime.
 `update --check` exits `10` when a newer version is available.
 `ci` adds codes 10–13 (failed, blocked, timed out, cancelled); see
 [CI exit codes](ci-integration.md#exit-codes).
+
+---
+
+## Video recording
+
+A run queued with video `on_failure` or `always` gets a recording of each case:
+
+| Platform | Video | Recorded with |
+|---|---|---|
+| Web, Electron | WebM of the page or the app's first window | Playwright |
+| Android | MP4 of the device screen | the device, through Appium; cases over 3 minutes are joined with ffmpeg |
+| iOS | H.264 of the device screen | `simctl` on simulators; Appium and ffmpeg on real devices |
+| Tauri, Windows apps, macOS apps | MP4 of the runner's screen | ffmpeg |
+
+**ffmpeg comes with the runner.** The runner uses an `ffmpeg` on its `PATH`
+when there is one. Otherwise it downloads a static build the first time a job
+needs it (that job waits for the download once) into
+`~/.leera-qa-runner/ffmpeg/b6.1.1/`, checked against a pinned size and sha256.
+`leera-qa-runner setup ffmpeg` downloads it ahead of time. The builds come from
+the GitHub release `b6.1.1` of the `ffmpeg-static` project (19–30 MB), which
+carries the GPL builds of johnvansickle.com (Linux), gyan.dev (Windows) and a
+macOS build; the runner does not ship ffmpeg itself. There are builds for macOS
+(Apple silicon and Intel), Linux (x64 and arm64) and Windows (x64; Windows on
+Arm runs the x64 build). On other machines, or when the runner cannot reach
+GitHub, install ffmpeg on the `PATH`; without it jobs run without a video and
+log why.
+
+**Screen recordings show the whole screen.** Tauri, Windows app and macOS app
+jobs record the screen the app runs on, not only its window: anything else
+open on the runner's screen is in the video. Run such runners on a machine or
+account used for testing, or close other windows. On Linux, a Tauri job
+without `DISPLAY` records the Xvfb display the runner starts for it, which
+shows only the app.
+
+**macOS asks once.** Recording the screen on a Mac needs *Screen Recording*
+permission for the app that runs the runner (the terminal for
+`leera-qa-runner start`, the `node` binary for the background service):
+System Settings → Privacy & Security → Screen Recording. Without it the job
+runs without a video.
+
+Screen recordings are H.264 MP4 at 10 frames a second, at most 1920 pixels
+wide. macOS captures only changes, so a video can end at the last change on
+screen, before the job does. A video over 50 MB is not kept.
 
 ---
 
@@ -837,10 +883,10 @@ the environment's default build, or else the newest ready build, is used.
 ### Video and logs
 
 - **Video** is recorded on the device as **MP4** and attached to the case like
-  web videos. Android records in 3-minute chunks: a case that runs longer than 3
-  minutes needs **`ffmpeg` on the runner's `PATH`** to join them, otherwise the
-  video cannot be saved (the results are still recorded). Recording stops at 30
-  minutes.
+  web videos. Android records in 3-minute chunks, which ffmpeg joins for a case
+  that runs longer: the runner downloads it when none is on the `PATH` (see
+  [Video recording](#video-recording)); without it such a video cannot be saved
+  (the results are still recorded). Recording stops at 30 minutes.
 - **Device log.** The runner follows `logcat` while the job runs and keeps the
   app's warning and error lines (at most 200 per step) under the step that was
   running, plus **crash reports** (`FATAL EXCEPTION` blocks and `ANR in` lines
@@ -1026,9 +1072,10 @@ devices.
 
 - **Video** is H.264 video (in a QuickTime container with some Xcode versions;
   it plays in Chrome and Safari). On simulators it is recorded with `simctl` and
-  needs nothing else. On real devices Appium records the screen, which needs
-  **`ffmpeg` on the Mac's `PATH`**; without it the job runs without a video.
-  Recording stops at 30 minutes.
+  needs nothing else. On real devices Appium records the screen with ffmpeg,
+  which the runner downloads when none is on the `PATH` (see
+  [Video recording](#video-recording)); without it the job runs without a
+  video. Recording stops at 30 minutes.
 - **Device log.** On simulators the runner follows the simulator's system log
   for the app's process; on real devices it reads the device's syslog through
   Appium. The app's error and fault lines (at most 200 per step) are kept under
@@ -1345,11 +1392,14 @@ runner".
 5. Runs the steps, then ends the session, closes the app and stops
    `tauri-driver` and Xvfb.
 
-Locating elements and taking snapshots is done by two scripts that ship with
-the runner, run in the app's web view through WebDriver. They are the only
-scripts the runner executes there; a test script cannot run JavaScript of its
-own. Targets are therefore limited to `css`, `text`, `test_id` and `xpath` (see
-[Tauri actions](qa-automation-authoring.md#tauri-actions)).
+Locating elements, taking snapshots, focusing an element before a key press and
+selecting a list option are done by three scripts that ship with the runner,
+run in the app's web view through WebDriver. They are the only scripts the
+runner executes there; a test script cannot run JavaScript of its own. Targets
+are therefore limited to `css`, `text`, `test_id` and `xpath` (see
+[Tauri actions](qa-automation-authoring.md#tauri-actions)). To act on an
+element, the runner adds a `data-qa-runner-mark` attribute to it for a moment,
+so that WebDriver can find it, and removes it straight after.
 
 ### Tauri on macOS
 
@@ -1378,22 +1428,45 @@ job is reported **blocked** with:
 
 Without the setting, a Mac runner never claims Tauri jobs.
 
+The plugin starts in any one of the app's windows. When the app has several
+windows open at launch, the runner switches to the window labelled `main`
+(Tauri's label for an app's first window unless the app names it), as Linux
+and Windows jobs start in the app's first window. Use `focus_window` with a
+title for any other window.
+
 ### Tauri video and logs
 
-- **No video.** Tauri runs record no video, whatever the run's video setting.
+- **Video** is an MP4 of the runner's screen (on Linux without `DISPLAY`, the
+  Xvfb display the job starts), from before the app starts until the job ends.
+  A script that restarts the app stays in the same video, and every step links
+  to where it starts. The runner records with ffmpeg and downloads it when none
+  is installed; on a Mac it needs Screen Recording permission (see
+  [Video recording](#video-recording)).
 - **Screenshots** for steps (verified and failure screenshots, `screenshot`
   actions) are taken through WebDriver.
+- **No console or network log**: WebDriver does not report them.
 
 ### Tauri known limitations
 
 - **macOS:** only builds with the embedded WebDriver plugin, and only with
-  `tauri.macos_plugin` on.
+  `tauri.macos_plugin` on. The plugin (checked with
+  `tauri-plugin-wdio-webdriver` 1.4) simulates input with JavaScript events,
+  which differ from a real keyboard and mouse:
+  - Enter and Tab reach only the page's own key handlers: Enter does not
+    submit a form and Tab does not move focus.
+  - Shift, Control, Alt and Command are dropped from Enter, Escape, Tab,
+    Backspace, Delete, the arrow keys and F1–F12 (Shift+Tab arrives as Tab).
+  - Home, End, Page Up, Page Down and Insert are typed into a focused field
+    as characters.
+  - `hover` fires only `mousemove`: menus that open on `mouseover`,
+    `mouseenter` or CSS `:hover` stay closed.
+  - `focus_window` by `index` follows no fixed window order; use `title`.
 - **Windows:** `msedgedriver` must match the WebView2 version, and WebView2
   updates on its own; update `tauri.native_driver_path` with it.
 - **Targets** are `css`, `text`, `test_id` and `xpath` only; no `role`,
   `label` or `placeholder`. Add `data-testid` attributes to the elements tests
   use.
-- **No video.**
+- **Video shows the whole screen** on macOS and Windows, not only the app.
 - **Native parts of the app** outside the web view (system menus, native file
   dialogs, notifications, the tray) cannot be reached.
 - **Not in Docker:** the Docker image runs web jobs only.
@@ -1464,8 +1537,8 @@ leera-qa-runner doctor --platform windows
 ```
 
 `doctor` checks that WinAppDriver 1.2.1 is installed, Developer Mode is on and
-the Appium Windows driver is installed with the runner, and warns when `ffmpeg`
-is missing (no video). It cannot tell whether the runner is in an interactive
+the Appium Windows driver is installed with the runner, and says where video
+recording gets `ffmpeg` (see [Video recording](#video-recording)). It cannot tell whether the runner is in an interactive
 desktop session: that shows up as jobs failing at once (see
 [Troubleshooting](#troubleshooting)). Each failure names the step that fixes
 it, and `doctor` exits `4` when any check fails.
@@ -1529,9 +1602,9 @@ under test, and moving another window over it can make a step fail.
 
 ### Windows video and logs
 
-- **Video** only when `ffmpeg` is on the runner's `PATH` (screen capture with
-  `gdigrab`). Without ffmpeg, runs record no video whatever the run's video
-  setting.
+- **Video** is an MP4 of the whole screen (ffmpeg's `gdigrab`). The runner
+  downloads ffmpeg when none is on the `PATH` (see
+  [Video recording](#video-recording)).
 - **Screenshots** for steps are taken through the driver.
 - **Failed steps** get the tail of the Appium log.
 
@@ -1547,7 +1620,7 @@ under test, and moving another window over it can make a step fail.
 - **Elevated apps** (apps that ask for administrator rights) cannot be driven
   from a runner that is not elevated itself, and the service runs without
   elevation.
-- **No video without ffmpeg.**
+- **Video shows the whole screen**, not only the app.
 - **Installers** (`.msi`) are not accepted as builds; install the app yourself
   and use *Already installed on the runner* or *Installed at path*.
 - **Not in Docker**, and one desktop app job at a time per runner.
@@ -1713,9 +1786,10 @@ Mac while jobs run**.
 
 ### macOS video and logs
 
-- **Video** only when `ffmpeg` is on the runner's `PATH` (screen capture with
-  `avfoundation`, which also needs *Screen Recording* permission for the same
-  terminal or `node` binary). Without ffmpeg, runs record no video.
+- **Video** is an MP4 of the whole screen (ffmpeg's `avfoundation`), which
+  needs *Screen Recording* permission for the same terminal or `node` binary.
+  The runner downloads ffmpeg when none is on the `PATH` (see
+  [Video recording](#video-recording)).
 - **Screenshots** for steps are taken through the driver.
 - **Failed steps** get the tail of the Appium log.
 
@@ -1731,7 +1805,7 @@ Mac while jobs run**.
   [CI integration](ci-integration.md#native-windows-and-macos-apps-in-ci).
 - **Controls without accessibility information** can only be reached by `role`
   with `nth`, `predicate` or `class_chain`; give them an identifier in the app.
-- **No video without ffmpeg.**
+- **Video shows the whole screen**, not only the app.
 - **Not in Docker**, and one desktop app job at a time per runner.
 
 ---
@@ -1811,6 +1885,22 @@ a random e-mail domain.
 
 ---
 
+## Two-step sign-in and the `credential-otp` label
+
+A QA credential can hold a fixed one-time code for apps that ask for a code
+after the password, and scripts type it with `{{credential.otp}}` (see
+[Two-step sign-in](qa-automation-authoring.md#two-step-sign-in)). A runner
+released with this support reports it when it registers, and the server gives
+it the **`credential-otp`** label. You do not add the label yourself.
+
+A job whose script uses `{{credential.otp}}` requires `credential-otp`, so an
+older runner never claims it. The job stays queued until a runner in the pool
+has the label: [update](#updating) the pool's runners, and restart any runner
+you started by hand so it registers again. A device session on a runner without
+the label refuses commands that use `{{credential.otp}}`.
+
+---
+
 ## Updating
 
 Runner and server share one version number. The Test runners page marks runners
@@ -1877,8 +1967,8 @@ platforms, `leera-qa-runner doctor`. On macOS, an update moves the runner's
   app platforms the app's id and a short-lived download link for the app build
   (or, for desktop apps, the path of the app on the runner), the fields of the
   [test data](qa-test-data.md) values the case declares (never secrets), and,
-  when a run is queued with a QA credential, that account's **username and
-  password**.
+  when a run is queued with a QA credential, that account's **username,
+  password and one-time code**, if it has one.
   Treat a runner machine like any place those accounts could be used from, and
   revoke the token if the machine is compromised.
 - **Secrets in results.** Credential values are redacted from step notes and
@@ -1926,7 +2016,8 @@ runner version. [Update](#updating) the runner.
 idle, and that its labels include what the job needs (`web-chromium` for web
 jobs, `android` for Android jobs, `ios` for iOS jobs, `electron` for Electron
 jobs, `tauri` for Tauri jobs, `windows` and `macos` for native app jobs, and
-`data-refs` for jobs whose script uses [test data or the other newer placeholders](#test-data-and-the-data-refs-label)), and
+`data-refs` for jobs whose script uses [test data or the other newer placeholders](#test-data-and-the-data-refs-label),
+and `credential-otp` for jobs whose script types a [one-time code](#two-step-sign-in-and-the-credential-otp-label)), and
 — for every platform but web — that one of its devices is free
 (a device in a live session is busy).
 `leera-qa-runner doctor --platform <platform>` explains a missing label.

@@ -197,7 +197,8 @@ ready and `4` when something marked `[fail]` needs fixing, with the command that
 The runner advertises phones (`android`, `android-real`), running emulators and emulators that
 exist but are off (`android`, `android-emulator`); an emulator is booted when a job needs it and
 stays booted. Each job installs the build, clears the app's data, records an MP4 when asked
-(runs over 3 minutes need `ffmpeg` on `PATH`) and captures the app's logcat warnings, errors and
+(runs over 3 minutes are joined with ffmpeg, which the runner downloads when none is installed)
+and captures the app's logcat warnings, errors and
 crashes per step. The same devices serve **device sessions**, in which an AI agent explores the
 app over MCP before writing a script. Details: [Android](https://github.com/leera-app/leera-qa-runner/blob/main/docs/test-runners.md#android),
 [device sessions](https://github.com/leera-app/leera-qa-runner/blob/main/docs/qa-automation-authoring.md#device-sessions).
