@@ -191,6 +191,7 @@ A target names **exactly one** locator of its platform. Optional on any target:
 | `{{job.id}}` / `{{job.attempt}}` | The automation job's id; the attempt number, from 1 | all |
 | `{{item.id}}` | The run item's id | all |
 | `{{date.today}}` / `{{now.iso}}` | Today's date (`YYYY-MM-DD`) and the current time (ISO 8601), both in UTC | all |
+| `{{file.<name>}}` | A [test file](qa-test-files.md) the case declares. In the `files` of `upload`, `drop_files` or `add_files` it is the file itself; anywhere else it is the file's name, such as `invoice.pdf` | all |
 
 A script that uses `{{credential.*}}` **signs in**: the case needs a sign-in
 role, and that role needs an account with a password — one for the run's
@@ -205,6 +206,12 @@ picked for the run; otherwise the case is skipped when queued. A `goto` or
 `deep_link` URL may start with a data placeholder. See
 [Test data](qa-test-data.md) for declaring references, setting values and the
 skip messages.
+
+A script that uses `{{file.*}}` **hands files to the app**: the case must declare
+each file, and each must be an active test file of the project, or the case is
+skipped when queued. Jobs that use test files are only claimed by runners with
+the `test-files` label ([Test runners](test-runners.md#test-files-and-the-test-files-label)).
+See [Test files](qa-test-files.md) for each platform's file actions.
 
 Jobs whose script uses `{{data.*}}`, `{{env.api_base_url}}`, `{{job.*}}`,
 `{{item.id}}`, `{{date.today}}` or `{{now.iso}}`, or `{{random.email}}` on an
@@ -261,8 +268,12 @@ text; use a longer code.
 | `press` | `key`, `target?` | Presses a key (`Enter`, `Tab`, `Control+A`…) on the element, or on the page when `target` is omitted |
 | `expect_url` | `value`, `match?` | Checks the page URL |
 | `expect_title` | `value`, `match?` | Checks the page title |
+| `upload` | `target`, `files` | Hands [test files](qa-test-files.md) to a file input: the `<input type=file>`, its label, or the button that opens the file chooser |
+| `drop_files` | `target`, `files` | Drops test files onto a drop zone as if dragged from the desktop |
 
-plus the [shared actions](#shared-actions).
+plus the [shared actions](#shared-actions). `files` is a list of 1–10 entries,
+each `{{file.<name>}}` or a `{{data.<reference>.<field>}}` whose value is a test
+file's name; never a path.
 
 ### Web targets
 
@@ -300,6 +311,7 @@ user sees. Use `css` only when nothing else identifies the element.
 | `scroll_to` | `target`, `direction?`, `max_swipes?` | Swipes until the element is visible: `direction` defaults to `down`, `max_swipes` (1–20) to 10 |
 | `set_orientation` | `value` | `portrait` or `landscape` |
 | `accept_alert` / `dismiss_alert` | — | Answers a system dialog, e.g. a permission prompt |
+| `add_files` | `files` | Copies [test files](qa-test-files.md) into the device's Download folder for the app's file picker; the script then taps through the picker |
 
 plus the [shared actions](#shared-actions). Web actions are refused with a hint,
 e.g. `automation.steps[0].actions[0].type 'goto' is not an android action; use
@@ -365,6 +377,7 @@ The same touch actions as [Android](#android-actions), except:
 | `launch` | — | Brings the app to the front, or starts it. There is no `activity` |
 | `reset` | — | Reinstalls the app from the run's build; for an app that is *already installed on the runner*, clears its data on a simulator (blocked on a real device) |
 | `hide_keyboard` | — | **Not available.** Use `press {"key": "return"}` or tap outside the field |
+| `add_files` | `files` | On a simulator: photos and videos go to the Photos library, other [test files](qa-test-files.md) to the app's Documents folder. Not available on real devices |
 
 Everything else works as on Android: `terminate`, `deep_link`, `tap`,
 `double_tap`, `long_press`, `type`, `clear`, `press`, `swipe`, `scroll_to`,
@@ -452,8 +465,9 @@ actions for the app itself:
 The web actions work as in a browser, on the focused window: `click`, `hover`,
 `check`, `uncheck`, `fill`, `select_option`, `press` (`Enter`, `Control+S`…),
 `expect_url` and `expect_title` (they read the focused window's URL and title),
-plus the [shared actions](#shared-actions). `goto` is refused: an Electron app
-decides what it loads. Targets are the web locators (`role` + `name`, `label`,
+plus the [shared actions](#shared-actions), and `upload` and `drop_files` for
+[test files](qa-test-files.md#electron) (a button that opens the app's own Open
+dialog works too). `goto` is refused: an Electron app decides what it loads. Targets are the web locators (`role` + `name`, `label`,
 `placeholder`, `text`, `test_id`, `css`); prefer `role`, `label` and `test_id`
 as for web.
 
@@ -516,9 +530,11 @@ as for web.
 
 Tauri scripts use the same actions as [Electron](#electron-actions): the
 [web actions](#web-actions) without `goto` (`click`, `hover`, `check`,
-`uncheck`, `fill`, `select_option`, `press`, `expect_url`, `expect_title`),
-`launch {args?}`, `terminate {}`, `focus_window {title | index}`, and the
-[shared actions](#shared-actions). They run on Linux and Windows runners, and on
+`uncheck`, `fill`, `select_option`, `press`, `expect_url`, `expect_title`,
+`upload`, `drop_files`), `launch {args?}`, `terminate {}`,
+`focus_window {title | index}`, and the [shared actions](#shared-actions).
+`upload` only fills an `<input type=file>` (or its label): a native Open dialog
+is out of WebDriver's reach ([Test files](qa-test-files.md#tauri)). They run on Linux and Windows runners, and on
 a Mac only for builds with the embedded WebDriver plugin (see
 [Tauri](test-runners.md#tauri)). On a Mac the plugin simulates key presses and
 pointer moves with JavaScript events: check
@@ -641,6 +657,7 @@ driver set up (see [Windows apps](test-runners.md#windows-apps) and
 | `press` | `key`, `target?` | Presses a key or a key chord (below), on the element when a target is given |
 | `check` / `uncheck` | `target` | Sets a checkbox (or toggle) on or off |
 | `select_option` | `target`, `value` | Picks the entry named `value` in a combo box or pop-up button |
+| `upload` | `target`, `files` | Clicks the target, which opens the system Open dialog, and picks the [test files](qa-test-files.md#windows-and-macos) there |
 
 plus the [shared actions](#shared-actions). There is no `index` form of
 `focus_window`: use the window's title. Actions of other platforms are refused

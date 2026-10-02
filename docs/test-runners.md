@@ -43,8 +43,9 @@ over MCP — see [qa-automation-authoring.md](qa-automation-authoring.md).
   Windows or macOS apps; `data-refs` when it can fill
   [test data](#test-data-and-the-data-refs-label) placeholders; `credential-otp`
   when it can type an account's
-  [one-time code](#two-step-sign-in-and-the-credential-otp-label)). A job is
-  only claimed by a runner whose labels cover what the job needs.
+  [one-time code](#two-step-sign-in-and-the-credential-otp-label); `test-files`
+  when it can hand [test files](#test-files-and-the-test-files-label) to an
+  app). A job is only claimed by a runner whose labels cover what the job needs.
 - **Your own labels.** A machine can also carry labels you give it, which is how
   you send a run to one machine rather than to whichever runner is free:
 
@@ -572,6 +573,7 @@ Without `RUNNER_LABELS`, labels are the detected ones plus `labels.extra`, minus
 | `appium/` | Appium's home (`APPIUM_HOME`) with the bundled UiAutomator2, XCUITest, Mac2 and Windows drivers, seeded by `setup android` / `setup ios` / `setup macos` / `setup windows` |
 | `wda/<driver>-<xcode>/` | WebDriverAgent prebuilt for simulators by `setup ios`, one directory per XCUITest driver and Xcode version (`…-real` for real devices; `<dir>.build.log` is the build log) |
 | `cache/builds/` | Downloaded app builds, by SHA-256, at most 10 GB (least recently used first out) |
+| `cache/test-files/` | Downloaded [test files](#test-files-and-the-test-files-label), by SHA-256, at most 2 GB (least recently used first out) |
 | `logs/emulator-*.log` | Output of emulators the runner booted |
 | `winappdriver/` | The WinAppDriver 1.2.1 installer downloaded by `setup windows` |
 | `macos-accessibility-blocked` | Written when macOS refused UI testing; while it exists the Mac advertises no macOS device. Removed by `setup macos` |
@@ -1901,6 +1903,30 @@ the label refuses commands that use `{{credential.otp}}`.
 
 ---
 
+## Test files and the `test-files` label
+
+Scripts hand [test files](qa-test-files.md) to the app with `upload`,
+`drop_files` and `add_files`, and name them with `{{file.<name>}}`. A runner
+released with this support reports it when it registers, and the server gives
+it the **`test-files`** label. You do not add the label yourself. A job whose
+script uses a test file requires the label, so an older runner never claims it;
+[update](#updating) the pool's runners.
+
+With the job, the runner receives each file's name, file name, size and kind.
+Before the app starts it downloads each uploaded file through a short-lived
+link, checks its size and SHA-256, and writes each generated file (zeros or
+random bytes of the given size) into a folder of the job's own, which it
+removes when the job ends. Downloads are kept in `cache/test-files/` (2 GB,
+least recently used first out), so a file many cases upload is fetched once;
+the machine needs room for the largest generated file a job uses, up to 2 GB.
+A script only ever hands over these files, never a path on the runner machine.
+
+On macOS, `upload` puts the folder's path on the pasteboard to paste it into the
+Open dialog's Go to Folder, replacing whatever was copied there. Device sessions
+have no test files.
+
+---
+
 ## Updating
 
 Runner and server share one version number. The Test runners page marks runners
@@ -2017,7 +2043,8 @@ idle, and that its labels include what the job needs (`web-chromium` for web
 jobs, `android` for Android jobs, `ios` for iOS jobs, `electron` for Electron
 jobs, `tauri` for Tauri jobs, `windows` and `macos` for native app jobs, and
 `data-refs` for jobs whose script uses [test data or the other newer placeholders](#test-data-and-the-data-refs-label),
-and `credential-otp` for jobs whose script types a [one-time code](#two-step-sign-in-and-the-credential-otp-label)), and
+`credential-otp` for jobs whose script types a [one-time code](#two-step-sign-in-and-the-credential-otp-label),
+and `test-files` for jobs whose script uploads [test files](#test-files-and-the-test-files-label)), and
 — for every platform but web — that one of its devices is free
 (a device in a live session is busy).
 `leera-qa-runner doctor --platform <platform>` explains a missing label.
