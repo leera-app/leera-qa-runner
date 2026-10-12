@@ -72,7 +72,7 @@ SmartScreen may warn before it runs ("More info" → "Run anyway").
 
 ### npm
 
-With Node.js 22.12 or newer:
+With Node.js 22.19 or newer:
 
 ```sh
 npm install -g @leera.io/qa-runner

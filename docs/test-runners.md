@@ -76,7 +76,7 @@ with the same version as the server:
 | Install | Best for |
 |---|---|
 | **Installer** (macOS `.pkg`, Windows `.exe`, Linux `.tar.gz`) with Node bundled | Laptops and dedicated test machines; web, Android, Electron, Tauri, iOS and macOS apps on a Mac, Windows apps on Windows |
-| **npm** `@leera.io/qa-runner` | Machines that already have Node 22.12 or newer, and [CI](#ci-runners); web, Android, Electron, Tauri, iOS and macOS apps on a Mac, Windows apps on Windows |
+| **npm** `@leera.io/qa-runner` | Machines that already have Node 22.19 or newer, and [CI](#ci-runners); web, Android, Electron, Tauri, iOS and macOS apps on a Mac, Windows apps on Windows |
 | **Docker** `ghcr.io/leera-app/leera-qa-runner` | Servers and CI; web tests only |
 
 The **Test runners** page in the app shows each of these with your instance's
@@ -164,7 +164,7 @@ command that installs them, rather than running `sudo` itself.
 npm install -g @leera.io/qa-runner@<version>
 ```
 
-Needs Node.js 22.12 or newer. Appium and its UiAutomator2 (Android), XCUITest
+Needs Node.js 22.19 or newer. Appium and its UiAutomator2 (Android), XCUITest
 (iOS), Mac2 (macOS apps) and Windows (Windows apps) drivers are optional
 dependencies of the package: npm installs them unless you pass
 `--omit=optional`, in which case the runner runs web, Electron and Tauri jobs

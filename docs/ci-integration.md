@@ -695,7 +695,7 @@ without it `--video` has no effect there.
 
 ### Other CI systems
 
-Any CI that can run Node 22.12 or newer works the same way: install
+Any CI that can run Node 22.19 or newer works the same way: install
 `@leera.io/qa-runner` at your instance's version, run the platform's `setup`
 command (none for Electron; the WebDriver pieces above for Tauri; `setup windows`
 or `setup macos` for native apps), and run `leera-qa-runner ci` with `RUNNER_URL` and
