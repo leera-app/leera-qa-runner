@@ -27,7 +27,22 @@ over MCP — see [qa-automation-authoring.md](qa-automation-authoring.md).
 
 - **Pools.** Runners belong to a *pool*. When you queue a run you choose the
   pool, and any online runner in it can claim the jobs. Create pools under
-  **QA → Test runners** (or **Workspace settings → Test runners**).
+  **QA → Test runners** (administrators can also use **Workspace settings →
+  Test runners**).
+- **Private or public.** A new pool is **private**: only the person who created
+  it can queue runs, start device sessions or run CI pipelines on it, so a
+  runner on your own laptop is not taken over by someone else's automation and
+  never receives other people's test-account passwords. Its creator or a
+  workspace administrator (for the built-in runner's pool, workspace
+  administrators only) can make it **public**, with the switch on the pool or
+  when creating it; then anyone in the workspace with QA can use it, and the
+  run dialog says whose machines they are. Administrators manage every pool but
+  cannot queue runs on someone else's private pool either. Pools created before
+  this setting existed are public, and the self-hosted built-in runner's pool
+  is always public. Making a pool private does not cancel jobs others already
+  queued on it. A CI token's runs
+  count as its creator's, so on a private pool only tokens its creator made can
+  start runs.
 - **Tokens.** A runner authenticates with a pool token (`pm_run_…`). The token
   is shown once, when you create it. It lets a runner claim that pool's jobs
   and record their results — nothing else.
@@ -272,19 +287,20 @@ clipboard.
 | Tool | What it is for |
 |---|---|
 | `workspace_get_runner_install` | Everything needed to install: the command for each operating system, the CLI's name, the version matching this instance, the documentation links, the pools a runner can join, what each platform needs installed first, and the steps in order. Read-only. Takes an optional `platform` and `pool_id` to narrow the answer |
-| `workspace_create_test_runner_token` | Mints a pool token and returns it with the connect and install commands. **Workspace administrators only.** Shown once |
+| `workspace_create_test_runner_token` | Mints a pool token and returns it with the connect and install commands. **The pool's creator or a workspace administrator only.** Shown once |
 | `workspace_list_test_runners` | The connected machines, with operating system, version, online and busy state, labels, devices, and each one's setup report — which checks pass, which fail, and the fix command for the ones that do not. Read-only; pass `include_health: false` to leave the reports out |
 
 ### Administering pools, tokens and runners
 
-Six more tools cover the housekeeping around a pool. All of them are
-**workspace administrators only** — the check is the same one the web UI and the
-REST routes use.
+Six more tools cover the housekeeping around a pool. Anyone with QA access can
+create a pool; the rest are for **the pool's creator or a workspace
+administrator only**, because a pool's tokens let a machine receive test
+accounts' passwords. The check is the same one the web UI and the REST routes use.
 
 | Tool | What it is for |
 |---|---|
-| `workspace_create_test_runner_pool` | Add a pool: a team's laptops, a site's device lab, a set of build agents. Check the existing pools first — an extra pool with no runner in it is somewhere runs can be queued and never picked up |
-| `workspace_update_test_runner_pool` | Rename a pool or change its description. This is all that is editable; the pool keeps its id, its tokens and its runners |
+| `workspace_create_test_runner_pool` | Add a pool: a team's laptops, a site's device lab, a set of build agents. Private to its creator unless `visibility` is `public`. Check the existing pools first — an extra pool with no runner in it is somewhere runs can be queued and never picked up |
+| `workspace_update_test_runner_pool` | Rename a pool, change its description, or make it `private` or `public`. This is all that is editable; the pool keeps its id, its tokens and its runners |
 | `workspace_delete_test_runner_pool` | Delete a pool for good. Takes its tokens, runner entries, device sessions and the automation job record of every run that used it — the runs and their per-case results are kept, the job history behind them is not. Refused while the pool has queued or running jobs, and refused for the built-in pool while the built-in runner is on |
 | `workspace_list_test_runner_tokens` | A pool's tokens: name, kind, project, when created and when a machine last used one. **Metadata only** — a token's secret is stored hashed and can never be read back, by this tool or any other |
 | `workspace_revoke_test_runner_token` | Stop a token being usable. The machine holding it can no longer claim jobs or receive test accounts' passwords, and its runner entries go with it. Cannot be undone |
@@ -325,9 +341,9 @@ token, so an agent that reads only one of the two still gets them:
 - never echo it, never print it back in chat, never write it into a file nobody
   asked for, and never commit it.
 
-Only workspace administrators can mint one. An agent connected with anyone
-else's token gets `only workspace administrators can manage test runners` and
-nothing is created — the same rule, and the same message, as the button in the
+Only the pool's creator or a workspace administrator can mint one. Anyone else
+gets `only the pool's creator or a workspace administrator can manage this pool`
+and nothing is created — the same rule, and the same message, as the button in the
 app. The other two tools are read-only and anyone with QA read access can call
 them.
 
