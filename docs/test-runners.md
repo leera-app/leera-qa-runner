@@ -599,6 +599,8 @@ Settings for app platforms (`config set KEY VALUE`):
 | Key | Meaning |
 |---|---|
 | `android.sdk_path` | Android SDK directory (absolute path); wins over `ANDROID_HOME` |
+| `android.emulator_gpu` | `-gpu` mode for emulators the runner boots: `host`, `swiftshader_indirect` (default), `angle_indirect`, `auto` |
+| `android.emulator_args` | Extra emulator flags, separated by spaces, e.g. `-no-snapshot-load -no-snapshot-save -feature -Vulkan` |
 | `builds.allow_local_paths` | `true` lets app installs of type `path` (a desktop app at a path on this machine) run (default `false`; `RUNNER_ALLOW_LOCAL_PATHS`) |
 | `ios.team_id` | Apple Developer Team ID (10 characters) that signs WebDriverAgent for real iOS devices (`RUNNER_IOS_TEAM_ID`) |
 | `ios.wda_bundle_id` | Bundle id to sign WebDriverAgent under, e.g. `com.example.WebDriverAgentRunner` (`RUNNER_IOS_WDA_BUNDLE_ID`) |
@@ -820,6 +822,26 @@ dismissed. Emulators stay booted between jobs; their output goes to
 `~/.leera-qa-runner/logs/emulator-<id>.log`. Real phones get the same
 preparation where the phone allows it (some refuse to change settings; that is
 logged and ignored).
+
+**Emulator graphics.** The default software renderer (`-gpu swiftshader_indirect`)
+works on most machines, but on some hosts an app (Flutter apps especially) stops
+drawing: screenshots stay on the splash screen while the element tree shows the
+next screen, and screenshots eventually stop answering. Choose the renderer and
+extra flags for this machine, then shut the emulator down so the runner boots it
+again with them (a running emulator keeps the flags it was started with):
+
+```bash
+leera-qa-runner config set android.emulator_gpu host
+leera-qa-runner config set android.emulator_args "-no-snapshot-load -no-snapshot-save -feature -Vulkan"
+adb -s emulator-5554 emu kill
+```
+
+Every emulator the runner boots afterwards uses them. The command line is written
+to the emulator's log, and `logs/runner.log` records each device's command and its
+renderer (the `GLES:` line of `dumpsys SurfaceFlinger`). A screenshot that does
+not arrive within 10 s is retried with `adb screencap`; when that does not answer
+either, the step is blocked (a session command reports `screenshot failed: …` in
+its logs) instead of the run waiting on a stalled emulator.
 
 When you queue a run you can leave the device as *Any Android device*, pick a
 specific device on a specific runner, or require labels, e.g. `android-real` to

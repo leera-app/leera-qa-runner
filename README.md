@@ -203,6 +203,21 @@ crashes per step. The same devices serve **device sessions**, in which an AI age
 app over MCP before writing a script. Details: [Android](https://github.com/leera-app/leera-qa-runner/blob/main/docs/test-runners.md#android),
 [device sessions](https://github.com/leera-app/leera-qa-runner/blob/main/docs/qa-automation-authoring.md#device-sessions).
 
+**Emulator graphics.** Emulators boot with the software renderer (`-gpu swiftshader_indirect`).
+If screenshots stay on the splash screen while the element tree has moved on, or stop answering,
+try another renderer for this machine, then stop the emulator so the runner boots it with the new
+flags (an emulator that is already running keeps the flags it started with):
+
+```sh
+leera-qa-runner config set android.emulator_gpu host
+leera-qa-runner config set android.emulator_args "-no-snapshot-load -no-snapshot-save -feature -Vulkan"
+adb -s emulator-5554 emu kill
+```
+
+`logs/runner.log` records each device's emulator command and renderer, and
+`logs/emulator-*.log` starts each boot with the command line. A screenshot that takes more than
+10 s is retried with `adb screencap`; if that fails too, the step is blocked with a clear message.
+
 ## Configuration
 
 Settings are read in this order; the first one set wins:
@@ -236,6 +251,8 @@ leera-qa-runner config path
 | `action_timeout_ms` | `RUNNER_ACTION_TIMEOUT_MS` | `15000` | Time limit per action |
 | `job_timeout_ms` | `RUNNER_JOB_TIMEOUT_MS` | `900000` | Time limit per job; later steps are blocked |
 | `android.sdk_path` | — (`ANDROID_HOME`) | detected | Android SDK directory, absolute path; wins over `ANDROID_HOME` |
+| `android.emulator_gpu` | — | `swiftshader_indirect` | `-gpu` mode for emulators the runner boots (`host`, `angle_indirect`, `auto`, …) |
+| `android.emulator_args` | — | — | Extra emulator flags separated by spaces, e.g. `-no-snapshot-load -no-snapshot-save -feature -Vulkan` |
 | `builds.allow_local_paths` | `RUNNER_ALLOW_LOCAL_PATHS` | `false` | Install apps from a file path on this machine (install `path`); off: such jobs are blocked |
 | — | `RUNNER_ONCE` | `false` | Exit after one job (`--once`) |
 | — | `RUNNER_RUN_ID` | — | Only take jobs from this test run (`--run-id`) |
